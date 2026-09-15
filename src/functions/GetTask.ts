@@ -1,21 +1,48 @@
-import { CosmosClient } from "@azure/cosmos";
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+/**
+ * Endpoint: GetTask (GET)
+ * ------------------------
+ * HTTP Route   : GET /api/GetTask
+ * Query Params : id             (WAJIB) - ID Task yang dicari
+ *                organizationId (WAJIB) - Partition key
+ * Response 200 : Object Task lengkap jika ditemukan
+ * Response 404 : { error: "Task not found" } jika tidak ada
+ * Response 400 : Jika salah satu query params hilang
+ *
+ * Response body:
+ *   { ...Task } | { error: "Task not found" }
+ */
 
-export async function GetTask(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { getContainer } from "../utils/cosmos";
+import { errorResponse, isErrorResponse, requireQueryParams, withErrorHandler } from "../utils/http";
+
+/** Ambil satu task berdasarkan id + organizationId. */
+async function _GetTask(
+    request: HttpRequest,
+    context: InvocationContext
+): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
 
-    const taskId = request.query.get('id');
-    const organizationId = request.query.get('organizationId');
+    // 1: Wajib ada id + organizationId di query string
+    const params = requireQueryParams(request, ["id", "organizationId"]);
+    if (isErrorResponse(params)) return params;
 
-    const client = new CosmosClient("this is a connection string");
-    const task = await client.database("TaskApp")
-        .container("Tasks")
-        .item(taskId, organizationId)
+    // 2: Point read (operasi tercepat di Cosmos DB)
+    const { resource: task } = await getContainer()
+        .item(params.id, params.organizationId)
         .read();
 
-    return { jsonBody: task.resource, status: 200 };
-};
+    // 3: 404 jika task tidak ditemukan
+    if (!task) {
+        return errorResponse("Task not found", 404);
+    }
 
+    return { jsonBody: task, status: 200 };
+}
+
+export const GetTask = withErrorHandler(_GetTask);
+
+/** Daftarkan endpoint GET GetTask ke Azure Functions Runtime. */
 app.http('GetTask', {
     methods: ['GET'],
     authLevel: 'anonymous',
