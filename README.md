@@ -2,9 +2,6 @@
 
 PR ini melakukan refaktorisasi menyeluruh pada backend Azure Functions guna meningkatkan aspek keamanan, stabilitas sistem, dan keterbacaan kode, sekaligus menambahkan endpoint API yang diperlukan untuk fitur Form Settings (Bagian 2).
 
-Diajukan oleh: Haryo Prastiko
-
----
 
 ## Daftar Perubahan
 
